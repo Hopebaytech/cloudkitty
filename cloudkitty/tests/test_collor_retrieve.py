@@ -56,6 +56,28 @@ class Test(unittest.TestCase):
         print vol
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
+        
+    def test_get_volume(self):
+        print sys._getframe().f_code.co_name
+        check_dt={}
+        #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
+        check_dt= self.collector.retrieve('volume','1464515000','1464519060')
+        
+        vol = check_dt['volume'][0]
+        print vol
+        self.assertIsNotNone(vol,'is none')
+        #self.assertEqual(calc_dt, check_dt)
+
+    def test_get_volume_size(self):
+        print sys._getframe().f_code.co_name
+        check_dt={}
+        #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
+        check_dt= self.collector.retrieve('volume.size','1464515000','1464519060')
+        
+        vol = check_dt['volume.size'][0]
+        print vol
+        self.assertIsNotNone(vol,'is none')
+        #self.assertEqual(calc_dt, check_dt)
 
     def test_get_network_bw_lbs_in(self):
         print sys._getframe().f_code.co_name
@@ -89,7 +111,7 @@ class Test(unittest.TestCase):
         print vol
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
-    '''    
+    
     def test_get_snapshot(self):
         print sys._getframe().f_code.co_name
         check_dt={}
@@ -122,7 +144,6 @@ class Test(unittest.TestCase):
         print vol
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
-    '''
 
     def _load_transformers(self):
         self.transformers = {}
