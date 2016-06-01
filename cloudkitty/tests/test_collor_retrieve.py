@@ -89,7 +89,7 @@ class Test(unittest.TestCase):
         print vol
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
-        
+    '''    
     def test_get_snapshot(self):
         print sys._getframe().f_code.co_name
         check_dt={}
@@ -122,7 +122,7 @@ class Test(unittest.TestCase):
         print vol
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
-
+    '''
 
     def _load_transformers(self):
         self.transformers = {}
@@ -134,3 +134,4 @@ class Test(unittest.TestCase):
             t_name = transformer.name
             t_obj = transformer.obj
             self.transformers[t_name] = t_obj
+    
