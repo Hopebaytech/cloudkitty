@@ -70,10 +70,11 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('bandwidth','0','86400')
+            check_dt= self.collector.retrieve('bandwidth','946684800','946771200')
         except Exception as e:
             s = str(e)
-            print s.find('no data')
+            print s
+            self.assertGreaterEqual(s.find('no data for resource'), 0)
         
     def test_get_volume(self):
         print sys._getframe().f_code.co_name
@@ -91,7 +92,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('volume','0','86400')
+            check_dt= self.collector.retrieve('volume','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -113,7 +114,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('volume.size','0','86400')
+            check_dt= self.collector.retrieve('volume.size','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -135,7 +136,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('network.bw.lbs.in','0','86400')
+            check_dt= self.collector.retrieve('network.bw.lbs.in','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -157,7 +158,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('network.bw.lbs.out','0','86400')
+            check_dt= self.collector.retrieve('network.bw.lbs.out','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -179,7 +180,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('network.bw.lbs.pool','0','86400')
+            check_dt= self.collector.retrieve('network.bw.lbs.pool','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -201,7 +202,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('snapshot','0','86400')
+            check_dt= self.collector.retrieve('snapshot','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -223,7 +224,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('snapshot.size','0','86400')
+            check_dt= self.collector.retrieve('snapshot.size','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
@@ -245,7 +246,7 @@ class Test(unittest.TestCase):
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
         try:
-            check_dt= self.collector.retrieve('radosgw.api.request','0','86400')
+            check_dt= self.collector.retrieve('radosgw.api.request','946684800','946771200')
         except Exception as e:
             s = str(e)
             print s
