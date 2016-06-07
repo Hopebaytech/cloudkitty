@@ -33,7 +33,8 @@ class ReportController(rest.RestController):
 
     _custom_actions = {
         'total': ['GET'],
-        'tenants': ['GET']
+        'tenants': ['GET'],
+        'summary': ['GET']
     }
 
     @wsme_pecan.wsexpose([wtypes.text],
@@ -63,3 +64,17 @@ class ReportController(rest.RestController):
         # enforce it by policy engine
         total = storage.get_total(begin, end, tenant_id)
         return total
+
+    @wsme_pecan.wsexpose(wtypes.DictType(wtypes.text, float),
+                         datetime.datetime,
+                         datetime.datetime,
+                         wtypes.text,
+                         wtypes.text)
+    def summary(self, begin=None, end=None, tenant_id=None, res_type=None):
+        """Return rate summary for a given period.
+
+        """
+        policy.enforce(pecan.request.context, 'report:get_summary', {})
+        storage = pecan.request.storage_backend
+        summary = storage.get_summary(begin, end, tenant_id, res_type)
+        return summary

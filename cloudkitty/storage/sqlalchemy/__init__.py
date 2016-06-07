@@ -104,6 +104,37 @@ class SQLAlchemyStorage(storage.BaseStorage):
         ).scalar()
         return rate
 
+    def get_summary(self, begin=None, end=None, tenant_id=None, res_type=None):
+        model = models.RatedDataFrame
+
+        # Boundary calculation
+        if not begin:
+            begin = ck_utils.get_month_start()
+        if not end:
+            end = ck_utils.get_next_month()
+
+        session = db.get_session()
+        q = session.query(
+            model.res_type,
+            sqlalchemy.func.sum(model.rate).label('rate')
+        )
+        if tenant_id:
+            q = q.filter(
+                model.tenant_id == tenant_id
+            )
+        q = q.filter(
+            model.begin >= begin,
+            model.end <= end
+        )
+        if not res_type:
+            q = q.filter(model.res_type != '_NO_DATA_')
+        else:
+            q = q.filter(model.res_type == res_type)
+        r = q.group_by(
+            model.res_type
+        ).all()
+        return {k: v for (k, v) in r}
+
     def get_tenants(self, begin=None, end=None):
         model = models.RatedDataFrame
 
