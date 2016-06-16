@@ -106,8 +106,12 @@ class CeilometerCollector(collector.BaseCollector):
         """Generate ceilometer filter from kwargs."""
         q_filter = []
         for kwarg in kwargs:
-            q_filter.append({'field': kwarg, 'op': op, 'value': kwargs[kwarg]})
+            if kwarg =='tenant_id':
+                q_filter.append({'field': 'resource_metadata.tenant_id', 'op': op, 'value': kwargs[kwarg]})
+            else:
+                q_filter.append({'field': kwarg, 'op': op, 'value': kwargs[kwarg]})
         return q_filter
+
 
     def prepend_filter(self, prepend, **kwargs):
         """Filter composer."""
@@ -143,7 +147,10 @@ class CeilometerCollector(collector.BaseCollector):
         start_iso = ck_utils.ts2iso(start)
         req_filter = self.gen_filter(op='ge', timestamp=start_iso)
         if project_id:
-            req_filter.extend(self.gen_filter(project=project_id))
+            if meter=='ip.floating':
+                req_filter.extend(self.gen_filter(tenant_id=project_id))
+            else:
+                req_filter.extend(self.gen_filter(project=project_id))
         if end:
             end_iso = ck_utils.ts2iso(end)
             req_filter.extend(self.gen_filter(op='le', timestamp=end_iso))
