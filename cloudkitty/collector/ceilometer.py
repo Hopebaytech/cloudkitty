@@ -83,7 +83,6 @@ class CeilometerCollector(collector.BaseCollector):
 
     def __init__(self, transformers, **kwargs):
         super(CeilometerCollector, self).__init__(transformers, **kwargs)
-        LOG.info('transformers: {}'.format(transformers))
         self.user = cfg.CONF.ceilometer_collector.username
         self.password = cfg.CONF.ceilometer_collector.password
         self.tenant = cfg.CONF.ceilometer_collector.tenant
@@ -175,14 +174,12 @@ class CeilometerCollector(collector.BaseCollector):
                                                end,
                                                project_id,
                                                q_filter)
-        LOG.info('active_resources resources_stats : {}'.format(resources_stats))
         return [resource.groupby['resource_id']
                 for resource in resources_stats]
 
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
         active_instance_ids = self.active_resources('instance', start, end,
                                                     project_id, q_filter)
-        LOG.info('active_instance_ids : {}'.format(active_instance_ids))
         compute_data = []
         for instance_id in active_instance_ids:
             if not self._cacher.has_resource_detail('compute', instance_id):
@@ -443,10 +440,7 @@ class CeilometerCollector(collector.BaseCollector):
 
         lbs_data = []
         for lbs_stats in active_lbs_stats:
-            LOG.info('get_network_bw_lbs  lbs_stats: {}.'.format(lbs_stats))
             lbs_id = lbs_stats.groupby['resource_id']
-            LOG.info('get_network_bw_lbs  lbs_stats.groupby: {}.'.format(lbs_id))
-
             if not self._cacher.has_resource_detail('network.tap',
                                                     lbs_id):
                 raw_resource = self._conn.resources.get(lbs_id)
@@ -551,7 +545,6 @@ class CeilometerCollector(collector.BaseCollector):
 
         active_snapshot_ids = self.active_resources('snapshot', start, end,
                                                     project_id, q_filter)
-        LOG.info("active_snapshot_ids : {}".format(active_snapshot_ids))
         snapshot_data = []
         for snapshot_id in active_snapshot_ids:
             if not self._cacher.has_resource_detail('snapshot', snapshot_id):
@@ -577,7 +570,6 @@ class CeilometerCollector(collector.BaseCollector):
                                                    end,
                                                    project_id,
                                                    q_filter)
-        LOG.info("active_snapshot_sizeh_stats : {}".format(active_snapshot_size_stats))
         snapshot_size_data = []
         for snapshot_size_stats in active_snapshot_size_stats:
             snapshot_size_id = snapshot_size_stats.groupby['resource_id']
