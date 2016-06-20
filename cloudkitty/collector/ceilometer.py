@@ -36,7 +36,7 @@ ceilometer_collector_opts = [
                default='RegionOne',
                help='OpenStack region.'),
     cfg.StrOpt('url',
-               default='http://192.168.56.102:5000',
+               default='http://127.0.0.1:5000',
                help='OpenStack auth URL.'), ]
 
 cfg.CONF.register_opts(ceilometer_collector_opts, 'ceilometer_collector')
