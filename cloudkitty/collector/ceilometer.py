@@ -551,6 +551,12 @@ class CeilometerCollector(collector.BaseCollector):
                 raw_resource = self._conn.resources.get(snapshot_id)
                 snapshot = self.t_ceilometer.strip_resource_data('snapshot',
                                                                  raw_resource,snapshot_id)
+                
+                raw_resource_volume = self._conn.resources.get(raw_resource.metadata['volume_id'])
+                snapshot['metadata']['volume_type'] = raw_resource_volume.metadata['volume_type']
+
+
+                
                 self._cacher.add_resource_detail('snapshot',
                                                  snapshot_id,
                                                  snapshot)
@@ -578,9 +584,13 @@ class CeilometerCollector(collector.BaseCollector):
             if not self._cacher.has_resource_detail('snapshot.size',
                                                     snapshot_size_id):
                 raw_resource = self._conn.resources.get(snapshot_size_id)
+                
 
                 snapshot_size_pool = self.t_ceilometer.strip_resource_data('snapshot.size',
                                                                raw_resource,snapshot_size_id)
+                raw_resource_volume = self._conn.resources.get(raw_resource.metadata['volume_id'])
+                snapshot_size_pool['metadata']['volume_type'] = raw_resource_volume.metadata['volume_type']
+                
                 self._cacher.add_resource_detail('snapshot.size',
                                                  snapshot_size_id,
                                                  snapshot_size_pool)
