@@ -304,9 +304,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  tap)
             tap = self._cacher.get_resource_detail('network.tap',
                                                    tap_id)
-            tap_bw_mb = tap_stat.max / 1048576.0
+            tap_bw_mb = tap_stat.max / 1.0
             bw_data.append(self.t_cloudkitty.format_item(tap,
-                                                         'MB',
+                                                         'B',
                                                          tap_bw_mb))
         ck_res_name = 'network.bw.{}'.format(direction)
         if not bw_data:
@@ -381,9 +381,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  radosgw)
             radosgw = self._cacher.get_resource_detail('radosgw.containers.objects.size',
                                                        radosgw_container)
-            radosgw_size_mb = radosgw_stats.max / 1048576.0
+            radosgw_size_mb = radosgw_stats.max / 1.0
             radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
-                                                              'MB',
+                                                              'B',
                                                               radosgw_size_mb))
         if not radosgw_data:
             raise collector.NoDataCollected(self.collector_name, 'radosgw.containers.objects.size')
@@ -453,9 +453,9 @@ class CeilometerCollector(collector.BaseCollector):
             lbs = self._cacher.get_resource_detail('network.tap',
                                                       lbs_id)
 
-            lbs_bw_mb = lbs_stats.sum / 1048576.0
+            lbs_bw_mb = lbs_stats.sum / 1.0
             lbs_data.append(self.t_cloudkitty.format_item(lbs,
-                                                             'MB',
+                                                             'B',
                                                              lbs_bw_mb))
         ck_res_name = 'network.bw.{}'.format(direction)
         if not lbs_data:
@@ -531,9 +531,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  network_bandwidth_pool)
             network_bandwidth_pool = self._cacher.get_resource_detail('bandwidth',
                                                       bandwidth_id)
-            bandwidth_mb = bandwidth_stats.sum / 1048576.0
+            bandwidth_mb = bandwidth_stats.sum / 1.0
             bandwidth_data.append(self.t_cloudkitty.format_item(network_bandwidth_pool,
-                                                             'MB',
+                                                             'B',
                                                              bandwidth_mb))
         if not bandwidth_data:
             raise collector.NoDataCollected(self.collector_name, 'bandwidth')
