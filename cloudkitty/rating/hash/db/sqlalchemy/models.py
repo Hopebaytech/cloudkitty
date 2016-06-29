@@ -195,7 +195,7 @@ class HashMapMapping(Base, HashMapBase):
                                    unique=True)
     value = sqlalchemy.Column(sqlalchemy.String(255),
                               nullable=True)
-    cost = sqlalchemy.Column(sqlalchemy.Numeric(20, 8),
+    cost = sqlalchemy.Column(sqlalchemy.Numeric(20, 16),
                              nullable=False)
     map_type = sqlalchemy.Column(sqlalchemy.Enum('flat',
                                                  'rate',
