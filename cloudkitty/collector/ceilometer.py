@@ -437,10 +437,24 @@ class CeilometerCollector(collector.BaseCollector):
                                                    end,
                                                    project_id,
                                                    q_filter)
-
+        
+        old_active_lbs_stats = self.resources_stats(resource_type,
+                                                   start-300,
+                                                   start,
+                                                   project_id,
+                                                   q_filter)
         lbs_data = []
         for lbs_stats in active_lbs_stats:
             lbs_id = lbs_stats.groupby['resource_id']
+            lbs_flow = lbs_stats.max
+            
+            for old_lbs_stats in old_active_lbs_stats:
+                old_lbs_id=lbs_stats.groupby['resource_id']
+                LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id,lbs_id=lbs_id))
+                if lbs_id == old_lbs_id:
+                    lbs_flow = lbs_stats.max-old_lbs_stats.max
+                    break
+                
             if not self._cacher.has_resource_detail('network.tap',
                                                     lbs_id):
                 raw_resource = self._conn.resources.get(lbs_id)
@@ -453,7 +467,7 @@ class CeilometerCollector(collector.BaseCollector):
             lbs = self._cacher.get_resource_detail('network.tap',
                                                       lbs_id)
 
-            lbs_bw_mb = lbs_stats.sum / 1.0
+            lbs_bw_mb = lbs_flow / 1.0
             lbs_data.append(self.t_cloudkitty.format_item(lbs,
                                                              'B',
                                                              lbs_bw_mb))
