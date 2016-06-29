@@ -449,7 +449,7 @@ class CeilometerCollector(collector.BaseCollector):
             lbs_flow = lbs_stats.max
             
             for old_lbs_stats in old_active_lbs_stats:
-                old_lbs_id=lbs_stats.groupby['resource_id']
+                old_lbs_id=old_lbs_stats.groupby['resource_id']
                 LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id,lbs_id=lbs_id))
                 if lbs_id == old_lbs_id:
                     lbs_flow = lbs_stats.max-old_lbs_stats.max
