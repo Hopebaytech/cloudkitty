@@ -64,7 +64,7 @@ class CeilometerResourceCacher(object):
 
     def has_resource_detail(self, resource_type, resource_id):
         if resource_type in self._resource_cache:
-            if resource_id in self._resource_cache[resource_type]:
+            if resource_id in self._resource_cache[resource_type] and self._resource_cache[resource_type][resource_id]['metadata']:
                 return True
         return False
 
@@ -425,7 +425,7 @@ class CeilometerCollector(collector.BaseCollector):
                         end=None,
                         project_id=None,
                         q_filter=None):
-      
+
         if direction == 'lbs.in':
             resource_type = 'network.services.lb.incoming.bytes'
         else:
@@ -437,7 +437,7 @@ class CeilometerCollector(collector.BaseCollector):
                                                    end,
                                                    project_id,
                                                    q_filter)
-        
+
         old_active_lbs_stats = self.resources_stats(resource_type,
                                                    start-300,
                                                    start,
@@ -447,14 +447,14 @@ class CeilometerCollector(collector.BaseCollector):
         for lbs_stats in active_lbs_stats:
             lbs_id = lbs_stats.groupby['resource_id']
             lbs_flow = lbs_stats.max
-            
+
             for old_lbs_stats in old_active_lbs_stats:
-                old_lbs_id=old_lbs_stats.groupby['resource_id']
-                LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id,lbs_id=lbs_id))
-                if lbs_id == old_lbs_id:
+                old_lbs_id = old_lbs_stats.groupby['resource_id']
+                LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id, lbs_id=lbs_id))
+                if lbs_id == old_lbs_id and lbs_stats.max > old_lbs_stats.max:
                     lbs_flow = lbs_stats.max-old_lbs_stats.max
                     break
-                
+
             if not self._cacher.has_resource_detail('network.tap',
                                                     lbs_id):
                 raw_resource = self._conn.resources.get(lbs_id)
@@ -520,7 +520,7 @@ class CeilometerCollector(collector.BaseCollector):
 
             raise collector.NoDataCollected(self.collector_name, 'network.bw.lbs.pool')
         return self.t_cloudkitty.format_service('network.bw.lbs.pool', lbs_pool_data)
-    
+
 ### /lbs
 ### bandwidth
     def get_bandwidth(self, start, end=None, project_id=None, q_filter=None):
@@ -565,12 +565,12 @@ class CeilometerCollector(collector.BaseCollector):
                 raw_resource = self._conn.resources.get(snapshot_id)
                 snapshot = self.t_ceilometer.strip_resource_data('snapshot',
                                                                  raw_resource,snapshot_id)
-                
+
                 raw_resource_volume = self._conn.resources.get(raw_resource.metadata['volume_id'])
                 snapshot['metadata']['volume_type'] = raw_resource_volume.metadata['volume_type']
 
 
-                
+
                 self._cacher.add_resource_detail('snapshot',
                                                  snapshot_id,
                                                  snapshot)
@@ -584,7 +584,7 @@ class CeilometerCollector(collector.BaseCollector):
         return self.t_cloudkitty.format_service('snapshot', snapshot_data)
 
     def get_snapshot_size (self, start, end=None, project_id=None, q_filter=None):
-        
+
         active_snapshot_size_stats = self.resources_stats('snapshot.size',
                                                    start,
                                                    end,
@@ -598,13 +598,13 @@ class CeilometerCollector(collector.BaseCollector):
             if not self._cacher.has_resource_detail('snapshot.size',
                                                     snapshot_size_id):
                 raw_resource = self._conn.resources.get(snapshot_size_id)
-                
+
 
                 snapshot_size_pool = self.t_ceilometer.strip_resource_data('snapshot.size',
                                                                raw_resource,snapshot_size_id)
                 raw_resource_volume = self._conn.resources.get(raw_resource.metadata['volume_id'])
                 snapshot_size_pool['metadata']['volume_type'] = raw_resource_volume.metadata['volume_type']
-                
+
                 self._cacher.add_resource_detail('snapshot.size',
                                                  snapshot_size_id,
                                                  snapshot_size_pool)
