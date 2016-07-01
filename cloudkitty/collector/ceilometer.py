@@ -403,19 +403,71 @@ class CeilometerCollector(collector.BaseCollector):
                 raw_resource = self._conn.resources.get(radosgw_id)
                 radosgw = self.t_ceilometer.strip_resource_data('radosgw.api.request',
                                                                 raw_resource,radosgw_id)
-                
+
                 self._cacher.add_resource_detail('radosgw.api.request',
                                                  radosgw_id,
                                                  radosgw)
             radosgw = self._cacher.get_resource_detail('radosgw.api.request',
                                                        radosgw_id)
-            
+
             radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
                                                               'request',
                                                               radosgw_stats.sum))
         if not radosgw_data:
             raise collector.NoDataCollected(self.collector_name, 'radosgw.api.request')
         return self.t_cloudkitty.format_service('radosgw.api.request', radosgw_data)
+
+    def _get_radosgw_bw(self,
+                        direction,
+                        start,
+                        end=None,
+                        project_id=None,
+                        q_filter=None):
+
+        if direction == 'external.in':
+            resource_type = 'radosgw.external.incomming.byte'
+        elif direction == 'external.out':
+            resource_type = 'radosgw.external.outgoing.byte'
+        elif direction == 'internal.in':
+            resource_type = 'radosgw.internal.incomming.byte'
+        elif direction == 'internal.out':
+            resource_type = 'radosgw.internal.outgoing.byte'
+
+        active_radosgw_stats = self.resources_stats(resource_type,
+                                                    start,
+                                                    end,
+                                                    project_id,
+                                                    q_filter)
+        radosgw_data = []
+        for radosgw_stats in active_radosgw_stats:
+            radosgw_id = radosgw_stats.groupby['resource_id']
+
+
+            if not self._cacher.has_resource_detail(resource_type,
+                                                    radosgw_id):
+                raw_resource = self._conn.resources.get(radosgw_id)
+
+                radosgw = self.t_ceilometer.strip_resource_data(resource_type,
+                                                                raw_resource,
+                                                                radosgw_id)
+                self._cacher.add_resource_detail(resource_type,
+                                                 radosgw_id,
+                                                 radosgw)
+            radosgw = self._cacher.get_resource_detail(resource_type,
+                                                       radosgw_id)
+            radosgw_mb = radosgw_stats.sum / 1.0
+            radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
+                                                              'B',
+                                                              radosgw_mb))
+        if not radosgw_data:
+            raise collector.NoDataCollected(self.collector_name, resource_type)
+        return self.t_cloudkitty.format_service(resource_type, radosgw_data)
+
+    def get_radosgw_external_bw_in(self, start, end=None, project_id=None, q_filter=None):
+        return self._get_radosgw_bw('external.in', start, end, project_id, q_filter)
+
+    def get_radosgw_external_bw_out(self, start, end=None, project_id=None, q_filter=None):
+        return self._get_radosgw_bw('external.out', start, end, project_id, q_filter)
 ### /radosgw
 
 ### lbs
