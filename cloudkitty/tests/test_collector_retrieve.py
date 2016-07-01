@@ -31,7 +31,7 @@ class Test(unittest.TestCase):
         #start=1464525000,end=1464525060,project_id=982ea1a1fa2f4efda4a89bee11425c75,q_filter=None
         #func = getattr(self, 'get_bandwidth')
         
-        self.timestampStart = '1464739200'
+        self.timestampStart = '1462579200'
         self.timestampEnd = '1467244800' 
         
         
@@ -252,7 +252,49 @@ class Test(unittest.TestCase):
             print s
             self.assertGreaterEqual(s.find('no data for resource'), 0)
 
+    def test_get_radosgw_external_bw_out(self):
+        print sys._getframe().f_code.co_name
+        check_dt={}
+        #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
+        check_dt= self.collector.retrieve('radosgw.external.bw.out',self.timestampStart,self.timestampEnd)
+        
+        vol = check_dt['radosgw.external.bw.out'][0]
+        print vol
+        self.assertIsNotNone(vol,'is none')
+        #self.assertEqual(calc_dt, check_dt)
+        
+    def ddtest_get_radosgw_external_bw_out_noData(self):
+        print sys._getframe().f_code.co_name
+        check_dt={}
+        #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
+        try:
+            check_dt= self.collector.retrieve('radosgw.external.bw.out','946684800','946771200')
+        except Exception as e:
+            s = str(e)
+            print s
+            self.assertGreaterEqual(s.find('no data for resource'), 0)
 
+    def test_get_radosgw_external_bw_in(self):
+        print sys._getframe().f_code.co_name
+        check_dt={}
+        #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
+        check_dt= self.collector.retrieve('radosgw.external.bw.in',self.timestampStart,self.timestampEnd)
+        
+        vol = check_dt['radosgw.external.bw.in'][0]
+        print vol
+        self.assertIsNotNone(vol,'is none')
+        #self.assertEqual(calc_dt, check_dt)
+        
+    def ddtest_get_radosgw_external_bw_in_noData(self):
+        print sys._getframe().f_code.co_name
+        check_dt={}
+        #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
+        try:
+            check_dt= self.collector.retrieve('radosgw.external.bw.in','946684800','946771200')
+        except Exception as e:
+            s = str(e)
+            print s
+            self.assertGreaterEqual(s.find('no data for resource'), 0)
 
 
     def _load_transformers(self):
