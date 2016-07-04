@@ -491,7 +491,7 @@ class CeilometerCollector(collector.BaseCollector):
                                                    q_filter)
 
         old_active_lbs_stats = self.resources_stats(resource_type,
-                                                   start-300,
+                                                   start-1800,
                                                    start,
                                                    project_id,
                                                    q_filter)
@@ -503,7 +503,7 @@ class CeilometerCollector(collector.BaseCollector):
             for old_lbs_stats in old_active_lbs_stats:
                 old_lbs_id = old_lbs_stats.groupby['resource_id']
                 LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id, lbs_id=lbs_id))
-                if lbs_id == old_lbs_id and lbs_stats.max > old_lbs_stats.max:
+                if lbs_id == old_lbs_id and lbs_stats.max >= old_lbs_stats.max:
                     lbs_flow = lbs_stats.max-old_lbs_stats.max
                     break
 
