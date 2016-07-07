@@ -20,7 +20,7 @@ def upgrade():
     sa.Column('begin', sa.DateTime(), nullable=False),
     sa.Column('end', sa.DateTime(), nullable=False),
     sa.Column('unit', sa.String(length=255), nullable=False),
-    sa.Column('qty', sa.Numeric(), nullable=False),
+    sa.Column('qty', sa.Numeric(20,0), nullable=False),
     sa.Column('res_type', sa.String(length=255), nullable=False),
     sa.Column('rate', sa.Float(), nullable=False),
     sa.Column('desc', sa.Text(), nullable=False),

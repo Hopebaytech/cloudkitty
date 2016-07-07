@@ -64,7 +64,7 @@ class CeilometerResourceCacher(object):
 
     def has_resource_detail(self, resource_type, resource_id):
         if resource_type in self._resource_cache:
-            if resource_id in self._resource_cache[resource_type]:
+            if resource_id in self._resource_cache[resource_type] and self._resource_cache[resource_type][resource_id]['metadata']:
                 return True
         return False
 
@@ -304,9 +304,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  tap)
             tap = self._cacher.get_resource_detail('network.tap',
                                                    tap_id)
-            tap_bw_mb = tap_stat.max / 1048576.0
+            tap_bw_mb = tap_stat.max / 1.0
             bw_data.append(self.t_cloudkitty.format_item(tap,
-                                                         'MB',
+                                                         'B',
                                                          tap_bw_mb))
         ck_res_name = 'network.bw.{}'.format(direction)
         if not bw_data:
@@ -381,16 +381,65 @@ class CeilometerCollector(collector.BaseCollector):
                                                  radosgw)
             radosgw = self._cacher.get_resource_detail('radosgw.containers.objects.size',
                                                        radosgw_container)
-            radosgw_size_mb = radosgw_stats.max / 1048576.0
+            radosgw_size_mb = radosgw_stats.max / 1.0
             radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
-                                                              'MB',
+                                                              'B',
                                                               radosgw_size_mb))
         if not radosgw_data:
             raise collector.NoDataCollected(self.collector_name, 'radosgw.containers.objects.size')
         return self.t_cloudkitty.format_service('radosgw.containers.objects.size', radosgw_data)
 
     def get_radosgw_api_request(self, start, end=None, project_id=None, q_filter=None):
-        active_radosgw_stats = self.resources_stats('radosgw.api.request',
+
+        ceilometer_meter = ['radosgw.external.incomming.byte',
+                            'radosgw.external.outgoing.byte']
+        radosgw_data = []
+
+        for meter in ceilometer_meter:
+            LOG.info("meter :{}".format(meter))
+            active_radosgw_stats = self.resources_stats(meter,
+                                                        start,
+                                                        end,
+                                                        project_id,
+                                                        q_filter)
+            for radosgw_stats in active_radosgw_stats:
+                radosgw_id = radosgw_stats.groupby['resource_id']
+                if not self._cacher.has_resource_detail('radosgw.api.request',
+                                                        radosgw_id):
+                    raw_resource = self._conn.resources.get(radosgw_id)
+                    radosgw = self.t_ceilometer.strip_resource_data('radosgw.api.request',
+                                                                    raw_resource,
+                                                                    radosgw_id)
+                    self._cacher.add_resource_detail('radosgw.api.request',
+                                                     radosgw_id,
+                                                     radosgw)
+                radosgw = self._cacher.get_resource_detail('radosgw.api.request',
+                                                        radosgw_id)
+
+                radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
+                                                                  'request',
+                                                                  radosgw_stats.count))
+        if not radosgw_data:
+            raise collector.NoDataCollected(self.collector_name, 'radosgw.api.request')
+        return self.t_cloudkitty.format_service('radosgw.api.request', radosgw_data)
+
+    def _get_radosgw_bw(self,
+                        direction,
+                        start,
+                        end=None,
+                        project_id=None,
+                        q_filter=None):
+
+        if direction == 'external.in':
+            resource_type = 'radosgw.external.incomming.byte'
+        elif direction == 'external.out':
+            resource_type = 'radosgw.external.outgoing.byte'
+        elif direction == 'internal.in':
+            resource_type = 'radosgw.internal.incomming.byte'
+        elif direction == 'internal.out':
+            resource_type = 'radosgw.internal.outgoing.byte'
+
+        active_radosgw_stats = self.resources_stats(resource_type,
                                                     start,
                                                     end,
                                                     project_id,
@@ -398,24 +447,33 @@ class CeilometerCollector(collector.BaseCollector):
         radosgw_data = []
         for radosgw_stats in active_radosgw_stats:
             radosgw_id = radosgw_stats.groupby['resource_id']
-            if not self._cacher.has_resource_detail('radosgw.api.request',
+
+
+            if not self._cacher.has_resource_detail(resource_type,
                                                     radosgw_id):
                 raw_resource = self._conn.resources.get(radosgw_id)
-                radosgw = self.t_ceilometer.strip_resource_data('radosgw.api.request',
-                                                                raw_resource,radosgw_id)
-                
-                self._cacher.add_resource_detail('radosgw.api.request',
+
+                radosgw = self.t_ceilometer.strip_resource_data(resource_type,
+                                                                raw_resource,
+                                                                radosgw_id)
+                self._cacher.add_resource_detail(resource_type,
                                                  radosgw_id,
                                                  radosgw)
-            radosgw = self._cacher.get_resource_detail('radosgw.api.request',
+            radosgw = self._cacher.get_resource_detail(resource_type,
                                                        radosgw_id)
-            
+            radosgw_mb = radosgw_stats.sum / 1.0
             radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
-                                                              'request',
-                                                              radosgw_stats.sum))
+                                                              'B',
+                                                              radosgw_mb))
         if not radosgw_data:
-            raise collector.NoDataCollected(self.collector_name, 'radosgw.api.request')
-        return self.t_cloudkitty.format_service('radosgw.api.request', radosgw_data)
+            raise collector.NoDataCollected(self.collector_name, resource_type)
+        return self.t_cloudkitty.format_service(resource_type, radosgw_data)
+
+    def get_radosgw_external_bw_in(self, start, end=None, project_id=None, q_filter=None):
+        return self._get_radosgw_bw('external.in', start, end, project_id, q_filter)
+
+    def get_radosgw_external_bw_out(self, start, end=None, project_id=None, q_filter=None):
+        return self._get_radosgw_bw('external.out', start, end, project_id, q_filter)
 ### /radosgw
 
 ### lbs
@@ -425,7 +483,7 @@ class CeilometerCollector(collector.BaseCollector):
                         end=None,
                         project_id=None,
                         q_filter=None):
-      
+
         if direction == 'lbs.in':
             resource_type = 'network.services.lb.incoming.bytes'
         else:
@@ -438,9 +496,23 @@ class CeilometerCollector(collector.BaseCollector):
                                                    project_id,
                                                    q_filter)
 
+        old_active_lbs_stats = self.resources_stats(resource_type,
+                                                   start-1800,
+                                                   start,
+                                                   project_id,
+                                                   q_filter)
         lbs_data = []
         for lbs_stats in active_lbs_stats:
             lbs_id = lbs_stats.groupby['resource_id']
+            lbs_flow = lbs_stats.max
+
+            for old_lbs_stats in old_active_lbs_stats:
+                old_lbs_id = old_lbs_stats.groupby['resource_id']
+                LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id, lbs_id=lbs_id))
+                if lbs_id == old_lbs_id and lbs_stats.max >= old_lbs_stats.max:
+                    lbs_flow = lbs_stats.max-old_lbs_stats.max
+                    break
+
             if not self._cacher.has_resource_detail('network.tap',
                                                     lbs_id):
                 raw_resource = self._conn.resources.get(lbs_id)
@@ -453,9 +525,9 @@ class CeilometerCollector(collector.BaseCollector):
             lbs = self._cacher.get_resource_detail('network.tap',
                                                       lbs_id)
 
-            lbs_bw_mb = lbs_stats.sum / 1048576.0
+            lbs_bw_mb = lbs_flow / 1.0
             lbs_data.append(self.t_cloudkitty.format_item(lbs,
-                                                             'MB',
+                                                             'B',
                                                              lbs_bw_mb))
         ck_res_name = 'network.bw.{}'.format(direction)
         if not lbs_data:
@@ -506,7 +578,7 @@ class CeilometerCollector(collector.BaseCollector):
 
             raise collector.NoDataCollected(self.collector_name, 'network.bw.lbs.pool')
         return self.t_cloudkitty.format_service('network.bw.lbs.pool', lbs_pool_data)
-    
+
 ### /lbs
 ### bandwidth
     def get_bandwidth(self, start, end=None, project_id=None, q_filter=None):
@@ -531,9 +603,9 @@ class CeilometerCollector(collector.BaseCollector):
                                                  network_bandwidth_pool)
             network_bandwidth_pool = self._cacher.get_resource_detail('bandwidth',
                                                       bandwidth_id)
-            bandwidth_mb = bandwidth_stats.sum / 1048576.0
+            bandwidth_mb = bandwidth_stats.sum / 1.0
             bandwidth_data.append(self.t_cloudkitty.format_item(network_bandwidth_pool,
-                                                             'MB',
+                                                             'B',
                                                              bandwidth_mb))
         if not bandwidth_data:
             raise collector.NoDataCollected(self.collector_name, 'bandwidth')
@@ -551,12 +623,12 @@ class CeilometerCollector(collector.BaseCollector):
                 raw_resource = self._conn.resources.get(snapshot_id)
                 snapshot = self.t_ceilometer.strip_resource_data('snapshot',
                                                                  raw_resource,snapshot_id)
-                
+
                 raw_resource_volume = self._conn.resources.get(raw_resource.metadata['volume_id'])
                 snapshot['metadata']['volume_type'] = raw_resource_volume.metadata['volume_type']
 
 
-                
+
                 self._cacher.add_resource_detail('snapshot',
                                                  snapshot_id,
                                                  snapshot)
@@ -570,7 +642,7 @@ class CeilometerCollector(collector.BaseCollector):
         return self.t_cloudkitty.format_service('snapshot', snapshot_data)
 
     def get_snapshot_size (self, start, end=None, project_id=None, q_filter=None):
-        
+
         active_snapshot_size_stats = self.resources_stats('snapshot.size',
                                                    start,
                                                    end,
@@ -584,13 +656,13 @@ class CeilometerCollector(collector.BaseCollector):
             if not self._cacher.has_resource_detail('snapshot.size',
                                                     snapshot_size_id):
                 raw_resource = self._conn.resources.get(snapshot_size_id)
-                
+
 
                 snapshot_size_pool = self.t_ceilometer.strip_resource_data('snapshot.size',
                                                                raw_resource,snapshot_size_id)
                 raw_resource_volume = self._conn.resources.get(raw_resource.metadata['volume_id'])
                 snapshot_size_pool['metadata']['volume_type'] = raw_resource_volume.metadata['volume_type']
-                
+
                 self._cacher.add_resource_detail('snapshot.size',
                                                  snapshot_size_id,
                                                  snapshot_size_pool)
