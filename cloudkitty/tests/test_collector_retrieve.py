@@ -263,7 +263,7 @@ class Test(unittest.TestCase):
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
         
-    def ddtest_get_radosgw_external_bw_out_noData(self):
+    def test_get_radosgw_external_bw_out_noData(self):
         print sys._getframe().f_code.co_name
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
@@ -285,7 +285,7 @@ class Test(unittest.TestCase):
         self.assertIsNotNone(vol,'is none')
         #self.assertEqual(calc_dt, check_dt)
         
-    def ddtest_get_radosgw_external_bw_in_noData(self):
+    def test_get_radosgw_external_bw_in_noData(self):
         print sys._getframe().f_code.co_name
         check_dt={}
         #raw_data =func( '1464525000', '1464525060', '982ea1a1fa2f4efda4a89bee11425c75', None)
