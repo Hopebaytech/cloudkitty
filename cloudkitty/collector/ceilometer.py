@@ -390,7 +390,6 @@ class CeilometerCollector(collector.BaseCollector):
         return self.t_cloudkitty.format_service('radosgw.containers.objects.size', radosgw_data)
 
     def get_radosgw_api_request(self, start, end=None, project_id=None, q_filter=None):
-
         ceilometer_meter = ['radosgw.external.incomming.byte',
                             'radosgw.external.outgoing.byte']
         radosgw_data = []
@@ -430,13 +429,13 @@ class CeilometerCollector(collector.BaseCollector):
                         project_id=None,
                         q_filter=None):
 
-        if direction == 'external.in':
+        if direction == 'radosgw.external.bw.in':
             resource_type = 'radosgw.external.incomming.byte'
-        elif direction == 'external.out':
+        elif direction == 'radosgw.external.bw.out':
             resource_type = 'radosgw.external.outgoing.byte'
-        elif direction == 'internal.in':
+        elif direction == 'radosgw.internal.bw.in':
             resource_type = 'radosgw.internal.incomming.byte'
-        elif direction == 'internal.out':
+        elif direction == 'radosgw.internal.bw.out':
             resource_type = 'radosgw.internal.outgoing.byte'
 
         active_radosgw_stats = self.resources_stats(resource_type,
@@ -466,14 +465,14 @@ class CeilometerCollector(collector.BaseCollector):
                                                               'B',
                                                               radosgw_mb))
         if not radosgw_data:
-            raise collector.NoDataCollected(self.collector_name, resource_type)
-        return self.t_cloudkitty.format_service(resource_type, radosgw_data)
+            raise collector.NoDataCollected(self.collector_name, direction)
+        return self.t_cloudkitty.format_service(direction, radosgw_data)
 
     def get_radosgw_external_bw_in(self, start, end=None, project_id=None, q_filter=None):
-        return self._get_radosgw_bw('external.in', start, end, project_id, q_filter)
+        return self._get_radosgw_bw('radosgw.external.bw.in', start, end, project_id, q_filter)
 
     def get_radosgw_external_bw_out(self, start, end=None, project_id=None, q_filter=None):
-        return self._get_radosgw_bw('external.out', start, end, project_id, q_filter)
+        return self._get_radosgw_bw('radosgw.external.bw.out', start, end, project_id, q_filter)
 ### /radosgw
 
 ### lbs
