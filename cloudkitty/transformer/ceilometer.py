@@ -61,17 +61,19 @@ class CeilometerTransformer(transformer.BaseTransformer):
         res_data['volume_name'] = data.metadata['display_name']
         res_data['availability_zone'] = data.metadata['availability_zone']
         res_data['size'] = data.metadata['size']
+        res_data['metadata'] = {}
         return res_data
 
     def _strip_radosgw(self, data):
         res_data = {}
         res_data['project_id'] = data.project_id
+        res_data['metadata'] = data.metadata
         return res_data
 
     def _strip_default(self, data,res_id):
         res_data = {}
         res_data['resource_id'] = res_id
-        res_data['metadata']=data.metadata
+        res_data['metadata'] = data.metadata
         return res_data
 
     def strip_resource_data(self, res_type, res_data,res_id):
