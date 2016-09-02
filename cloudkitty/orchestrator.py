@@ -158,11 +158,13 @@ class Worker(BaseWorker):
 
     def check_state(self):
         timestamp = self._storage.get_state(self._tenant_id)
-        if not timestamp:
-            month_start = ck_utils.get_month_start()
-            return ck_utils.dt2ts(month_start)
-
         now = ck_utils.utcnow_ts()
+        if not timestamp:
+            #month_start = ck_utils.get_month_start()
+            rate_start = now-2*self._period
+            return ck_utils.dt2ts(rate_start)
+
+        
         next_timestamp = timestamp + self._period
         if next_timestamp + self._wait_time < now:
             return next_timestamp
@@ -186,6 +188,7 @@ class Worker(BaseWorker):
                                                    error=six.text_type(e)))
                         raise collector.NoDataCollected('', service)
                 except collector.NoDataCollected:
+                    LOG.info("No data collected , timestamp:{}".format(timestamp))
                     begin = timestamp
                     end = begin + self._period
                     for processor in self._processors:
@@ -262,6 +265,7 @@ class Orchestrator(object):
 
     def _collect(self, service, start_timestamp):
         next_timestamp = start_timestamp + CONF.collect.period
+        LOG.info("next_timestamp:{}".format(next_timestamp))
         raw_data = self.collector.retrieve(service,
                                            start_timestamp,
                                            next_timestamp)
@@ -293,6 +297,7 @@ class Orchestrator(object):
         while True:
             self.process_messages()
             self._load_tenant_list()
+            start = ck_utils.utcnow_ts()
             while len(self._tenants):
                 for tenant in self._tenants:
                     if not self._check_state(tenant):
@@ -303,7 +308,9 @@ class Orchestrator(object):
                                         tenant)
                         worker.run()
             # FIXME(sheeprine): We may cause a drift here
-            eventlet.sleep(CONF.collect.period)
+            end=now = ck_utils.utcnow_ts()
+            if end < start + CONF.collect.period:
+                eventlet.sleep(start + CONF.collect.period - end)
 
     def terminate(self):
         pass
