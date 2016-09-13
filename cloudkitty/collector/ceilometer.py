@@ -23,7 +23,6 @@ from cloudkitty import collector
 from cloudkitty import utils as ck_utils
 from oslo_log import log as logging
 from cinderclient import client as cinder_client
-from cinderclient import utils as cinder_utils
 
 ceilometer_collector_opts = [
     cfg.StrOpt('username',
@@ -106,8 +105,8 @@ class CeilometerCollector(collector.BaseCollector):
 
         self.cinder_conn = cinder_client.Client('2', 
                                        cfg.CONF.keystone_fetcher.username,
-                                       cfg.CONF.keystone_fetcher.password, 
-                                       cfg.CONF.keystone_fetcher.tenant, 
+                                       cfg.CONF.keystone_fetcher.password,
+                                       cfg.CONF.keystone_fetcher.tenant,
                                        cfg.CONF.keystone_fetcher.url,
                                        False, 
                                        region_name=self.region,
@@ -204,7 +203,7 @@ class CeilometerCollector(collector.BaseCollector):
         for o in vtypes:
             res_data = {}
             for field in fields:
-                field_name = field.lower().replace(' ', '_')
+                field_name = field.lower()
                 if type(o) == dict and field in o:
                     data = o[field]
                 else:
@@ -264,7 +263,7 @@ class CeilometerCollector(collector.BaseCollector):
         return self.t_cloudkitty.format_service('image', image_data)
 
 ### volume
-    def _get_volume(self, direction, start, end=None, project_id=None, q_filter=None):
+    def _get_volume(self, ref_info, start, end=None, project_id=None, q_filter=None):
         active_volume_ids = self.active_resources('volume',
                                                    start,
                                                    end,
@@ -282,12 +281,12 @@ class CeilometerCollector(collector.BaseCollector):
                                                  volume)
             volume = self._cacher.get_resource_detail('volume',
                                                       volume_id)
-            if volume['volume_type'] == direction['id']:
+            if volume['volume_type'] == ref_info['id']:
                 volume_data.append(self.t_cloudkitty.format_item(volume,
                                                                  'volume',
                                                                  1))
 
-        ck_res_name = 'volume.{}'.format(direction['name'])
+        ck_res_name = 'volume.{}'.format(ref_info['name'])
         if not volume_data:
             raise collector.NoDataCollected(self.collector_name, ck_res_name)
         return self.t_cloudkitty.format_service(ck_res_name, volume_data)
@@ -302,16 +301,16 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_volume(volume_type_collect, start, end, project_id, q_filter)
 
-    def get_volume(self, direction, start, end=None, project_id=None, q_filter=None):
+    def get_volume(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'volume')
 
-    def _get_volume_size(self, direction, start, end=None, project_id=None, q_filter=None):
+    def _get_volume_size(self, ref_info, start, end=None, project_id=None, q_filter=None):
         active_volume_stats = self.resources_stats('volume.size',
                                                    start,
                                                    end,
                                                    project_id,
                                                    q_filter)
-        LOG.info("volume type : {}".format(direction['id']))
+        LOG.info("volume type : {}".format(ref_info['id']))
         volume_data = []
         for volume_stats in active_volume_stats:
             volume_id = volume_stats.groupby['resource_id']
@@ -327,12 +326,12 @@ class CeilometerCollector(collector.BaseCollector):
             volume = self._cacher.get_resource_detail('volume.size',
                                                       volume_id)
             LOG.info("volume".format(volume['volume_type']))
-            #LOG.info("volume type => {volume_type}:{id}".format(volume_type=volume['volume_type'],id=direction['id']))            
-            if volume['volume_type'] == direction['id']:
+            #LOG.info("volume type => {volume_type}:{id}".format(volume_type=volume['volume_type'],id=ref_info['id']))            
+            if volume['volume_type'] == ref_info['id']:
                 volume_data.append(self.t_cloudkitty.format_item(volume,
                                                              'GB',
                                                              volume_stats.max))
-        ck_res_name = 'volume.size.{}'.format(direction['name'])
+        ck_res_name = 'volume.size.{}'.format(ref_info['name'])
         if not volume_data:
             raise collector.NoDataCollected(self.collector_name, ck_res_name)
         return self.t_cloudkitty.format_service(ck_res_name, volume_data)
@@ -345,21 +344,22 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_volume_size(volume_type_collect, start, end, project_id, q_filter)
 
-    def get_volume_size(self, direction, start, end=None, project_id=None, q_filter=None):
+    ## just for creating a no_data data
+    def get_volume_size(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'volume.size')
 
 ### /volume
 
     def _get_network_bw(self,
-                        direction,
+                        ref_info,
                         start,
                         end=None,
                         project_id=None,
                         q_filter=None):
-        if direction == 'in':
+        if ref_info == 'in':
             resource_type = 'network.incoming.bytes'
         else:
-            direction = 'out'
+            ref_info = 'out'
             resource_type = 'network.outgoing.bytes'
         active_tap_stats = self.resources_stats(resource_type,
                                                 start,
@@ -384,7 +384,7 @@ class CeilometerCollector(collector.BaseCollector):
             bw_data.append(self.t_cloudkitty.format_item(tap,
                                                          'B',
                                                          tap_bw_mb))
-        ck_res_name = 'network.bw.{}'.format(direction)
+        ck_res_name = 'network.bw.{}'.format(ref_info)
         if not bw_data:
             raise collector.NoDataCollected(self.collector_name,
                                             ck_res_name)
@@ -499,19 +499,19 @@ class CeilometerCollector(collector.BaseCollector):
         return self.t_cloudkitty.format_service('radosgw.api.request', radosgw_data)
 
     def _get_radosgw_bw(self,
-                        direction,
+                        ref_info,
                         start,
                         end=None,
                         project_id=None,
                         q_filter=None):
 
-        if direction == 'radosgw.external.bw.in':
+        if ref_info == 'radosgw.external.bw.in':
             resource_type = 'radosgw.external.incomming.byte'
-        elif direction == 'radosgw.external.bw.out':
+        elif ref_info == 'radosgw.external.bw.out':
             resource_type = 'radosgw.external.outgoing.byte'
-        elif direction == 'radosgw.internal.bw.in':
+        elif ref_info == 'radosgw.internal.bw.in':
             resource_type = 'radosgw.internal.incomming.byte'
-        elif direction == 'radosgw.internal.bw.out':
+        elif ref_info == 'radosgw.internal.bw.out':
             resource_type = 'radosgw.internal.outgoing.byte'
 
         active_radosgw_stats = self.resources_stats(resource_type,
@@ -541,8 +541,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                               'B',
                                                               radosgw_mb))
         if not radosgw_data:
-            raise collector.NoDataCollected(self.collector_name, direction)
-        return self.t_cloudkitty.format_service(direction, radosgw_data)
+            raise collector.NoDataCollected(self.collector_name, ref_info)
+        return self.t_cloudkitty.format_service(ref_info, radosgw_data)
 
     def get_radosgw_external_bw_in(self, start, end=None, project_id=None, q_filter=None):
         return self._get_radosgw_bw('radosgw.external.bw.in', start, end, project_id, q_filter)
@@ -553,16 +553,16 @@ class CeilometerCollector(collector.BaseCollector):
 
 ### lbs
     def _get_network_bw_lbs(self,
-                        direction,
+                        ref_info,
                         start,
                         end=None,
                         project_id=None,
                         q_filter=None):
 
-        if direction == 'lbs.in':
+        if ref_info == 'lbs.in':
             resource_type = 'network.services.lb.incoming.bytes'
         else:
-            direction = 'lbs.out'
+            ref_info = 'lbs.out'
             resource_type = 'network.services.lb.outgoing.bytes'
 
         active_lbs_stats = self.resources_stats(resource_type,
@@ -604,7 +604,7 @@ class CeilometerCollector(collector.BaseCollector):
             lbs_data.append(self.t_cloudkitty.format_item(lbs,
                                                              'B',
                                                              lbs_bw_mb))
-        ck_res_name = 'network.bw.{}'.format(direction)
+        ck_res_name = 'network.bw.{}'.format(ref_info)
         if not lbs_data:
             raise collector.NoDataCollected(self.collector_name, ck_res_name)
         return self.t_cloudkitty.format_service(ck_res_name, lbs_data)
@@ -686,9 +686,9 @@ class CeilometerCollector(collector.BaseCollector):
             raise collector.NoDataCollected(self.collector_name, 'bandwidth')
         return self.t_cloudkitty.format_service('bandwidth', bandwidth_data)
 ### /bandwidth
-  
+
 ### snapshot
-    def _get_snapshot (self, direction, start, end=None, project_id=None, q_filter=None):
+    def _get_snapshot (self, ref_info, start, end=None, project_id=None, q_filter=None):
 
         active_snapshot_ids = self.active_resources('snapshot', start, end,
                                                     project_id, q_filter)
@@ -710,11 +710,11 @@ class CeilometerCollector(collector.BaseCollector):
             snapshot = self._cacher.get_resource_detail('snapshot',
                                                         snapshot_id)
 
-            if snapshot['metadata']['volume_type']==direction['id']:
+            if snapshot['metadata']['volume_type']==ref_info['id']:
                 snapshot_data.append(self.t_cloudkitty.format_item(snapshot,
                                                               'snapshot',
                                                               1))
-        ck_res_name = 'snapshot.{}'.format(direction['name'])
+        ck_res_name = 'snapshot.{}'.format(ref_info['name'])
         if not snapshot_data:
             raise collector.NoDataCollected(self.collector_name, ck_res_name)
         return self.t_cloudkitty.format_service(ck_res_name, snapshot_data)
@@ -722,15 +722,15 @@ class CeilometerCollector(collector.BaseCollector):
     def get_snapshot_ssd(self, start, end=None, project_id=None, q_filter=None):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'ssd')
         return self._get_snapshot(volume_type_collect, start, end, project_id, q_filter)
-    
+
     def get_snapshot_hdd(self, start, end=None, project_id=None, q_filter=None):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_snapshot(volume_type_collect, start, end, project_id, q_filter)
 
-    def get_snapshot(self, direction, start, end=None, project_id=None, q_filter=None):
+    def get_snapshot(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'snapshot')
 
-    def _get_snapshot_size (self, direction, start, end=None, project_id=None, q_filter=None):
+    def _get_snapshot_size (self, ref_info, start, end=None, project_id=None, q_filter=None):
         active_snapshot_size_stats = self.resources_stats('snapshot.size',
                                                    start,
                                                    end,
@@ -758,11 +758,11 @@ class CeilometerCollector(collector.BaseCollector):
 
             snapshot_size_pool = self._cacher.get_resource_detail('snapshot.size',
                                                       snapshot_size_id)
-            if snapshot_size_pool['metadata']['volume_type']==direction['id']:
+            if snapshot_size_pool['metadata']['volume_type']==ref_info['id']:
                 snapshot_size_data.append(self.t_cloudkitty.format_item(snapshot_size_pool,
                                                              'GB',
                                                              snapshot_size_stats.max))
-        ck_res_name = 'snapshot.size.{}'.format(direction['name'])
+        ck_res_name = 'snapshot.size.{}'.format(ref_info['name'])
         if not snapshot_size_data:
             raise collector.NoDataCollected(self.collector_name, ck_res_name)
         return self.t_cloudkitty.format_service(ck_res_name, snapshot_size_data)
@@ -775,7 +775,7 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_snapshot_size(volume_type_collect, start, end, project_id, q_filter)
 
-    def get_snapshot_size(self, direction, start, end=None, project_id=None, q_filter=None):
+    def get_snapshot_size(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'snapshot.size')
 ### /snapshot
 
