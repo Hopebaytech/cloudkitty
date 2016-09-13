@@ -301,6 +301,8 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_volume(volume_type_collect, start, end, project_id, q_filter)
 
+    ## when we remove the value "volume" in cloudkitty.conf, 
+    ## we cant use cloudkitty-api to query rating data without res_type, because it will be failed
     def get_volume(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'volume')
 
@@ -344,7 +346,8 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_volume_size(volume_type_collect, start, end, project_id, q_filter)
 
-    ## just for creating a no_data data
+    ## when we remove the value "volume.size" in cloudkitty.conf, 
+    ## we cant use cloudkitty-api to query rating data without res_type, because it will be failed
     def get_volume_size(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'volume.size')
 
@@ -727,6 +730,8 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_snapshot(volume_type_collect, start, end, project_id, q_filter)
 
+    ## when we remove the value "snapshot" in cloudkitty.conf, 
+    ## we cant use cloudkitty-api to query rating data without res_type, because it will be failed
     def get_snapshot(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'snapshot')
 
@@ -774,7 +779,9 @@ class CeilometerCollector(collector.BaseCollector):
     def get_snapshot_size_hdd(self, start, end=None, project_id=None, q_filter=None):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_snapshot_size(volume_type_collect, start, end, project_id, q_filter)
-
+    
+    ## when we remove the value "snapshot.size" in cloudkitty.conf, 
+    ## we cant use cloudkitty-api to query rating data without res_type, because it will be failed
     def get_snapshot_size(self, ref_info, start, end=None, project_id=None, q_filter=None):
         raise collector.NoDataCollected(self.collector_name, 'snapshot.size')
 ### /snapshot
