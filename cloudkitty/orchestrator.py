@@ -29,7 +29,6 @@ from stevedore import extension
 
 from cloudkitty import collector
 from cloudkitty.common import rpc
-from cloudkitty import config  # noqa
 from cloudkitty import extension_manager
 from cloudkitty import utils as ck_utils
 
@@ -164,7 +163,6 @@ class Worker(BaseWorker):
             rate_start = now-2*self._period
             return rate_start
 
-        
         next_timestamp = timestamp + self._period
         if next_timestamp + self._wait_time < now:
             return next_timestamp
