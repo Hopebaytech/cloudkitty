@@ -29,7 +29,6 @@ from stevedore import extension
 
 from cloudkitty import collector
 from cloudkitty.common import rpc
-from cloudkitty import config  # noqa
 from cloudkitty import extension_manager
 from cloudkitty import utils as ck_utils
 
@@ -158,11 +157,12 @@ class Worker(BaseWorker):
 
     def check_state(self):
         timestamp = self._storage.get_state(self._tenant_id)
-        if not timestamp:
-            month_start = ck_utils.get_month_start()
-            return ck_utils.dt2ts(month_start)
-
         now = ck_utils.utcnow_ts()
+        if not timestamp:
+            #month_start = ck_utils.get_month_start()
+            rate_start = now-2*self._period
+            return rate_start
+
         next_timestamp = timestamp + self._period
         if next_timestamp + self._wait_time < now:
             return next_timestamp
@@ -177,7 +177,11 @@ class Worker(BaseWorker):
             for service in CONF.collect.services:
                 try:
                     try:
+                        LOG.info("tenant: {}".format(self._tenant_id))
+                        LOG.info("service: {}".format(service))
+                        LOG.info("timestamp: {}".format(timestamp))
                         data = self._collect(service, timestamp)
+                        LOG.info("data is collected")
                     except collector.NoDataCollected:
                         raise
                     except Exception as e:
@@ -186,17 +190,21 @@ class Worker(BaseWorker):
                                                    error=six.text_type(e)))
                         raise collector.NoDataCollected('', service)
                 except collector.NoDataCollected:
+                    LOG.info("No data collected , timestamp:{}".format(timestamp))
                     begin = timestamp
                     end = begin + self._period
                     for processor in self._processors:
                         processor.obj.nodata(begin, end)
                     self._storage.nodata(begin, end, self._tenant_id)
+                    LOG.info("No data collected is end")
                 else:
                     # Rating
+                    LOG.info("start to rate")
                     for processor in self._processors:
                         processor.obj.process(data)
                     # Writing
                     self._storage.append(data, self._tenant_id)
+                    LOG.info("rating is end")
 
             # We're getting a full period so we directly commit
             self._storage.commit(self._tenant_id)
@@ -249,11 +257,11 @@ class Orchestrator(object):
 
     def _check_state(self, tenant_id):
         timestamp = self.storage.get_state(tenant_id)
-        if not timestamp:
-            month_start = ck_utils.get_month_start()
-            return ck_utils.dt2ts(month_start)
-
         now = ck_utils.utcnow_ts()
+        if not timestamp:
+            rate_start = now-2*CONF.collect.period
+            return rate_start
+
         next_timestamp = timestamp + CONF.collect.period
         wait_time = CONF.collect.wait_periods * CONF.collect.period
         if next_timestamp + wait_time < now:
@@ -293,17 +301,26 @@ class Orchestrator(object):
         while True:
             self.process_messages()
             self._load_tenant_list()
+            start = ck_utils.utcnow_ts()
             while len(self._tenants):
                 for tenant in self._tenants:
+                    LOG.info('tenant : {}'.format(tenant))
                     if not self._check_state(tenant):
+                        LOG.info('remove tenant : {}'.format(tenant))
                         self._tenants.remove(tenant)
                     else:
+                        LOG.info('tenant run rate : {}'.format(tenant))
                         worker = Worker(self.collector,
                                         self.storage,
                                         tenant)
                         worker.run()
             # FIXME(sheeprine): We may cause a drift here
-            eventlet.sleep(CONF.collect.period)
+            end = ck_utils.utcnow_ts()
+            if end < start + CONF.collect.period:
+                LOG.info('sleep time : {}'.format(start + CONF.collect.period - end))
+                eventlet.sleep(start + CONF.collect.period - end)
 
     def terminate(self):
         pass
+
+
