@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 # Copyright 2014 Objectif Libre
 #
@@ -22,8 +23,7 @@ from cloudkitty import collector
 from cloudkitty import utils as ck_utils
 from oslo_log import log as logging
 from cinderclient import client as cinder_client
-from cinderclient import utils
-
+from cinderclient import utils as cinder_utils
 
 ceilometer_collector_opts = [
     cfg.StrOpt('username',
@@ -42,26 +42,7 @@ ceilometer_collector_opts = [
                default='http://127.0.0.1:5000',
                help='OpenStack auth URL.'), ]
 
-keystone_fetcher_opts = [
-    cfg.StrOpt('username',
-               default='',
-               help='OpenStack username.'),
-    cfg.StrOpt('password',
-               default='',
-               help='OpenStack password.'),
-    cfg.StrOpt('tenant',
-               default='',
-               help='OpenStack tenant.'),
-    cfg.StrOpt('region',
-               default='',
-               help='OpenStack region.'),
-    cfg.StrOpt('url',
-               default='',
-               help='OpenStack auth URL.'), ]
-
 cfg.CONF.register_opts(ceilometer_collector_opts, 'ceilometer_collector')
-cfg.CONF.register_opts(keystone_fetcher_opts, 'keystone_fetcher')
-
 LOG = logging.getLogger(__name__)
 
 class ResourceNotFound(Exception):
@@ -194,9 +175,11 @@ class CeilometerCollector(collector.BaseCollector):
             req_filter.extend(q_filter)
         elif q_filter:
             req_filter.append(q_filter)
+        LOG.info("start to statistics, meter:{}".format(meter))
         resources_stats = self._conn.statistics.list(meter_name=meter,
                                                      period=0, q=req_filter,
                                                      groupby=['resource_id'])
+        LOG.info("end to statistics")
         return resources_stats
 
     def active_resources(self,
@@ -213,7 +196,6 @@ class CeilometerCollector(collector.BaseCollector):
                                                q_filter)
         return [resource.groupby['resource_id']
                 for resource in resources_stats]
-
 
     def _get_volume_type_list(self, vtypes, volume_name):
         fields = ['ID', 'Name']
@@ -232,10 +214,8 @@ class CeilometerCollector(collector.BaseCollector):
                 return res_data
         return value
 
-
     def check_volume_type(self, volume_type_id):
         return self.cinder_conn.volume_types.get(volume_type_id)
-
 
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
         active_instance_ids = self.active_resources('instance', start, end,
@@ -322,13 +302,16 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_volume(volume_type_collect, start, end, project_id, q_filter)
 
+    def get_volume(self, direction, start, end=None, project_id=None, q_filter=None):
+        raise collector.NoDataCollected(self.collector_name, 'volume')
+
     def _get_volume_size(self, direction, start, end=None, project_id=None, q_filter=None):
         active_volume_stats = self.resources_stats('volume.size',
                                                    start,
                                                    end,
                                                    project_id,
                                                    q_filter)
-
+        LOG.info("volume type : {}".format(direction['id']))
         volume_data = []
         for volume_stats in active_volume_stats:
             volume_id = volume_stats.groupby['resource_id']
@@ -337,12 +320,14 @@ class CeilometerCollector(collector.BaseCollector):
                 raw_resource = self._conn.resources.get(volume_id)
                 volume = self.t_ceilometer.strip_resource_data('volume',
                                                                raw_resource,volume_id)
+                LOG.info("volume : {}".format(volume))
                 self._cacher.add_resource_detail('volume.size',
                                                  volume_id,
                                                  volume)
             volume = self._cacher.get_resource_detail('volume.size',
                                                       volume_id)
-
+            LOG.info("volume".format(volume['volume_type']))
+            #LOG.info("volume type => {volume_type}:{id}".format(volume_type=volume['volume_type'],id=direction['id']))            
             if volume['volume_type'] == direction['id']:
                 volume_data.append(self.t_cloudkitty.format_item(volume,
                                                              'GB',
@@ -359,6 +344,10 @@ class CeilometerCollector(collector.BaseCollector):
     def get_volume_size_hdd(self, start, end=None, project_id=None, q_filter=None):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_volume_size(volume_type_collect, start, end, project_id, q_filter)
+
+    def get_volume_size(self, direction, start, end=None, project_id=None, q_filter=None):
+        raise collector.NoDataCollected(self.collector_name, 'volume.size')
+
 ### /volume
 
     def _get_network_bw(self,
@@ -482,7 +471,7 @@ class CeilometerCollector(collector.BaseCollector):
         radosgw_data = []
 
         for meter in ceilometer_meter:
-            #LOG.info("meter :{}".format(meter))
+            LOG.info("meter :{}".format(meter))
             active_radosgw_stats = self.resources_stats(meter,
                                                         start,
                                                         end,
@@ -594,7 +583,7 @@ class CeilometerCollector(collector.BaseCollector):
 
             for old_lbs_stats in old_active_lbs_stats:
                 old_lbs_id = old_lbs_stats.groupby['resource_id']
-                #LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id, lbs_id=lbs_id))
+                LOG.info("{old_lbs_id}:{lbs_id}".format(old_lbs_id=old_lbs_id, lbs_id=lbs_id))
                 if lbs_id == old_lbs_id and lbs_stats.max >= old_lbs_stats.max:
                     lbs_flow = lbs_stats.max-old_lbs_stats.max
                     break
@@ -738,8 +727,10 @@ class CeilometerCollector(collector.BaseCollector):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_snapshot(volume_type_collect, start, end, project_id, q_filter)
 
-    def _get_snapshot_size (self, direction, start, end=None, project_id=None, q_filter=None):
+    def get_snapshot(self, direction, start, end=None, project_id=None, q_filter=None):
+        raise collector.NoDataCollected(self.collector_name, 'snapshot')
 
+    def _get_snapshot_size (self, direction, start, end=None, project_id=None, q_filter=None):
         active_snapshot_size_stats = self.resources_stats('snapshot.size',
                                                    start,
                                                    end,
@@ -783,5 +774,11 @@ class CeilometerCollector(collector.BaseCollector):
     def get_snapshot_size_hdd(self, start, end=None, project_id=None, q_filter=None):
         volume_type_collect = self._get_volume_type_list(self.cinder_conn.volume_types.list(),'hdd')
         return self._get_snapshot_size(volume_type_collect, start, end, project_id, q_filter)
+
+    def get_snapshot_size(self, direction, start, end=None, project_id=None, q_filter=None):
+        raise collector.NoDataCollected(self.collector_name, 'snapshot.size')
 ### /snapshot
+
+
+
 
