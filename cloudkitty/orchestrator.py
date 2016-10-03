@@ -151,15 +151,14 @@ class Worker(BaseWorker):
     def __init__(self, collector, storage, tenant_id=None):
         self._collector = collector
         self._storage = storage
-        self._start_thread = False
+
         self._period = CONF.collect.period
         self._wait_time = CONF.collect.wait_periods * self._period
         self.parsed_url = netutils.urlsplit(CONF.orchestrator.coordination_url)
         self._conn = self._get_connection(self.parsed_url)
-        self.lock_name = b"cloudkitty-" + str(tenant_id).encode('ascii')
         super(Worker, self).__init__(tenant_id)
 
-    def _get_connection(self, parsed_url):
+    def _get_connection(self,parsed_url):
         host = parsed_url.hostname
         port = parsed_url.port
         dbname = parsed_url.path[1:]
@@ -167,17 +166,17 @@ class Worker(BaseWorker):
         password = parsed_url.password
         try:
             return pymysql.Connect(host=host,
-                                   port=port,
-                                   user=username,
-                                   passwd=password,
-                                   database=dbname)
+                                    port=port,
+                                    user=username,
+                                    passwd=password,
+                                    database=dbname)
         except pymysql.err.OperationalError as e:
             LOG.info(e)
 
     def _locked(self):
         try:
             with self._conn as cur:
-                cur.execute("SELECT GET_LOCK(%s, 0);", self.lock_name)
+                cur.execute("SELECT GET_LOCK(%s, 0);", self._tenant_id)
                 return cur.fetchone()[0]
         except pymysql.MySQLError as e:
             LOG.info(e)
@@ -185,24 +184,18 @@ class Worker(BaseWorker):
 
     def _release(self):
         with self._conn as cur:
-            cur.execute("SELECT RELEASE_LOCK(%s);", self.lock_name)
+            cur.execute("SELECT RELEASE_LOCK(%s);", self._tenant_id)
             return cur.fetchone()[0]
 
     def _is_used_lock(self):
         try:
             with self._conn as cur:
-                cur.execute("SELECT IS_USED_LOCK(%s);", self.lock_name)
+                cur.execute("SELECT IS_USED_LOCK(%s);", self._tenant_id)
                 return cur.fetchone()[0]
         except pymysql.MySQLError as e:
             LOG.info("is_used_locked is failed, {}".format(e))
             self._conn = self._get_connection(self.parsed_url)
             self._locked()
-
-    def _is_free_lock(self):
-        while self._start_thread:
-            with self._conn as cur:
-                cur.execute("SELECT _IS_FREE_LOCK(%s);", self.lock_name)
-            eventlet.sleep(5)
 
     def _collect(self, service, start_timestamp):
         next_timestamp = start_timestamp + self._period
@@ -234,10 +227,6 @@ class Worker(BaseWorker):
         #if not locked_status:
         #    return False
         LOG.info("locked_status : {}".format(locked_status))
-        self._start_thread = True
-        t = threading.Thread(target=self._is_free_lock)
-        t.start()
-
         while locked_status:
             timestamp = self.check_state()
             if not timestamp:
@@ -278,12 +267,12 @@ class Worker(BaseWorker):
 
             # We're getting a full period so we directly commit
             self._storage.commit(self._tenant_id)
-        self._start_thread = False
+        #timer.cancel()
         if locked_status:
             LOG.info("{id} is over to be rated at timestamp:{time} ".format(id=self._tenant_id,time=ck_utils.utcnow_ts()))
         else:
             LOG.info("{} is locked by other processsor: ".format(self._tenant_id))
-
+        
 class Orchestrator(object):
     def __init__(self):
         # Tenant fetcher
@@ -395,3 +384,4 @@ class Orchestrator(object):
 
     def terminate(self):
         pass
+
