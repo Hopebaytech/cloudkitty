@@ -170,6 +170,7 @@ class CeilometerCollector(collector.BaseCollector):
         if end:
             end_iso = ck_utils.ts2iso(end)
             req_filter.extend(self.gen_filter(op='le', timestamp=end_iso))
+
         if isinstance(q_filter, list):
             req_filter.extend(q_filter)
         elif q_filter:
@@ -221,10 +222,25 @@ class CeilometerCollector(collector.BaseCollector):
                                                     project_id, q_filter)
         compute_data = []
         for instance_id in active_instance_ids:
-            if not self._cacher.has_resource_detail('compute', instance_id):
-                raw_resource = self._conn.resources.get(instance_id)
-                instance = self.t_ceilometer.strip_resource_data('compute',
-                                                                 raw_resource,instance_id)
+            if True:
+            #if not self._cacher.has_resource_detail('compute', instance_id):
+                sample_filter = [{'field': 'resource_metadata.event_type',
+                                  'op': 'eq',
+                                  'value' : 'compute.instance.exists' }]
+                start_iso = ck_utils.ts2iso(start)
+                sample_filter.extend(self.gen_filter(op='ge', timestamp=start_iso))
+
+                if end:
+                    end_iso = ck_utils.ts2iso(end)
+                    sample_filter.extend(self.gen_filter(op='lt', timestamp=end_iso))
+                instance_filter = {'field':'resource_id',
+                                   'op':'eq',
+                                   'value':instance_id
+                                   }
+                sample_filter.append(instance_filter)
+                raw_sample_resource = self._conn.samples.list('instance',sample_filter,1)
+                instance = self.t_ceilometer.strip_resource_data('compute_scale_up',
+                                                                 raw_sample_resource[0],instance_id)
                 self._cacher.add_resource_detail('compute',
                                                  instance_id,
                                                  instance)
