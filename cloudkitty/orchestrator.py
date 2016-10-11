@@ -36,7 +36,6 @@ from cloudkitty import collector
 from cloudkitty.common import rpc
 from cloudkitty import extension_manager
 from cloudkitty import utils as ck_utils
-from tooz import coordination
 
 
 eventlet.monkey_patch()
