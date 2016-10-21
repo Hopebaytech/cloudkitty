@@ -17,12 +17,17 @@
 # @author: Stéphane Albert
 #
 import decimal
+import random
+import uuid
+import pymysql
+import threading
 
 import eventlet
 from oslo.config import cfg
 from oslo_concurrency import lockutils
 from oslo_log import log as logging
 import oslo_messaging as messaging
+from oslo_utils import netutils
 import six
 from stevedore import driver
 from stevedore import extension
@@ -32,11 +37,19 @@ from cloudkitty.common import rpc
 from cloudkitty import extension_manager
 from cloudkitty import utils as ck_utils
 
+
 eventlet.monkey_patch()
 
 LOG = logging.getLogger(__name__)
 
 CONF = cfg.CONF
+orchestrator_opts = [
+    cfg.StrOpt('coordination_url',
+               secret=True,
+               help='Coordination driver URL',
+               default='file:///var/lib/cloudkitty/locks'),
+]
+CONF.register_opts(orchestrator_opts, group='orchestrator')
 CONF.import_opt('backend', 'cloudkitty.storage', 'storage')
 CONF.import_opt('backend', 'cloudkitty.tenant_fetcher', 'tenant_fetcher')
 
@@ -140,8 +153,48 @@ class Worker(BaseWorker):
 
         self._period = CONF.collect.period
         self._wait_time = CONF.collect.wait_periods * self._period
-
+        self.parsed_url = netutils.urlsplit(CONF.orchestrator.coordination_url)
+        self._conn = self._get_connection(self.parsed_url)
         super(Worker, self).__init__(tenant_id)
+
+    def _get_connection(self,parsed_url):
+        host = parsed_url.hostname
+        port = parsed_url.port
+        dbname = parsed_url.path[1:]
+        username = parsed_url.username
+        password = parsed_url.password
+        try:
+            return pymysql.Connect(host=host,
+                                    port=port,
+                                    user=username,
+                                    passwd=password,
+                                    database=dbname)
+        except pymysql.err.OperationalError as e:
+            LOG.info(e)
+
+    def _locked(self):
+        try:
+            with self._conn as cur:
+                cur.execute("SELECT GET_LOCK(%s, 0);", self._tenant_id)
+                return cur.fetchone()[0]
+        except pymysql.MySQLError as e:
+            LOG.info(e)
+            return False
+
+    def _release(self):
+        with self._conn as cur:
+            cur.execute("SELECT RELEASE_LOCK(%s);", self._tenant_id)
+            return cur.fetchone()[0]
+
+    def _is_used_lock(self):
+        try:
+            with self._conn as cur:
+                cur.execute("SELECT IS_USED_LOCK(%s);", self._tenant_id)
+                return cur.fetchone()[0]
+        except pymysql.MySQLError as e:
+            LOG.info("is_used_locked is failed, {}".format(e))
+            self._conn = self._get_connection(self.parsed_url)
+            self._locked()
 
     def _collect(self, service, start_timestamp):
         next_timestamp = start_timestamp + self._period
@@ -169,12 +222,17 @@ class Worker(BaseWorker):
         return 0
 
     def run(self):
-        while True:
+        locked_status = self._locked()
+        #if not locked_status:
+        #    return False
+        LOG.info("locked_status : {}".format(locked_status))
+        while locked_status:
             timestamp = self.check_state()
             if not timestamp:
+                self._release()
                 break
-
             for service in CONF.collect.services:
+                self._is_used_lock()
                 try:
                     try:
                         LOG.info("tenant: {}".format(self._tenant_id))
@@ -208,8 +266,12 @@ class Worker(BaseWorker):
 
             # We're getting a full period so we directly commit
             self._storage.commit(self._tenant_id)
-
-
+        #timer.cancel()
+        if locked_status:
+            LOG.info("{id} is over to be rated at timestamp:{time} ".format(id=self._tenant_id,time=ck_utils.utcnow_ts()))
+        else:
+            LOG.info("{} is locked by other processsor: ".format(self._tenant_id))
+        
 class Orchestrator(object):
     def __init__(self):
         # Tenant fetcher
@@ -305,15 +367,14 @@ class Orchestrator(object):
             while len(self._tenants):
                 for tenant in self._tenants:
                     LOG.info('tenant : {}'.format(tenant))
-                    if not self._check_state(tenant):
-                        LOG.info('remove tenant : {}'.format(tenant))
-                        self._tenants.remove(tenant)
-                    else:
+                    if self._check_state(tenant):
                         LOG.info('tenant run rate : {}'.format(tenant))
                         worker = Worker(self.collector,
                                         self.storage,
                                         tenant)
                         worker.run()
+                    LOG.info('remove tenant : {}'.format(tenant))
+                    self._tenants.remove(tenant)
             # FIXME(sheeprine): We may cause a drift here
             end = ck_utils.utcnow_ts()
             if end < start + CONF.collect.period:
@@ -322,5 +383,4 @@ class Orchestrator(object):
 
     def terminate(self):
         pass
-
 
