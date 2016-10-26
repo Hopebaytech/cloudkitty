@@ -177,7 +177,8 @@ class CeilometerCollector(collector.BaseCollector):
             req_filter.append(q_filter)
         LOG.info("start to statistics, meter:{}".format(meter))
         resources_stats = self._conn.statistics.list(meter_name=meter,
-                                                     period=0, q=req_filter,
+                                                     period=cfg.CONF.collect.window, 
+                                                     q=req_filter,
                                                      groupby=['resource_id'])
         LOG.info("end to statistics")
         return resources_stats
@@ -194,6 +195,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                end,
                                                project_id,
                                                q_filter)
+        LOG.info("resources_stats : {}".format(resources_stats))
+        LOG.info("resources_groupby: {}".format([resource.groupby['resource_id'] for resource in resources_stats]))
         return [resource.groupby['resource_id']
                 for resource in resources_stats]
 
@@ -218,12 +221,16 @@ class CeilometerCollector(collector.BaseCollector):
         return self.cinder_conn.volume_types.get(volume_type_id)
 
     def get_compute(self, start, end=None, project_id=None, q_filter=None):
-        active_instance_ids = self.active_resources('instance', start, end,
-                                                    project_id, q_filter)
+        active_instance_stats = self.resources_stats('instance',
+                                                  start,
+                                                  end,
+                                                  project_id,
+                                                  q_filter)
         compute_data = []
-        for instance_id in active_instance_ids:
+        for instance_stats in active_instance_stats:
             if True:
             #if not self._cacher.has_resource_detail('compute', instance_id):
+                instance_id = instance_stats.groupby['resource_id']
                 sample_filter = [{'field': 'resource_metadata.event_type',
                                   'op': 'eq',
                                   'value' : 'compute.instance.exists' }]
@@ -241,6 +248,8 @@ class CeilometerCollector(collector.BaseCollector):
                 raw_sample_resource = self._conn.samples.list('instance',sample_filter,1)
                 instance = self.t_ceilometer.strip_resource_data('compute_scale_up',
                                                                  raw_sample_resource[0],instance_id)
+                instance['duration_start'] = instance_stats.duration_start
+                instance['duration_end'] = instance_stats.duration_end
                 self._cacher.add_resource_detail('compute',
                                                  instance_id,
                                                  instance)
@@ -249,6 +258,7 @@ class CeilometerCollector(collector.BaseCollector):
             compute_data.append(self.t_cloudkitty.format_item(instance,
                                                               'instance',
                                                               1))
+            
         if not compute_data:
             raise collector.NoDataCollected(self.collector_name, 'compute')
         return self.t_cloudkitty.format_service('compute', compute_data)
@@ -271,6 +281,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  image)
             image = self._cacher.get_resource_detail('image',
                                                      image_id)
+            image['duration_start'] = image_stats.duration_start
+            image['duration_end'] = image_stats.duration_end
             image_data.append(self.t_cloudkitty.format_item(image,
                                                             'image',
                                                             image_stats.max))
@@ -343,6 +355,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  volume)
             volume = self._cacher.get_resource_detail('volume.size',
                                                       volume_id)
+            volume['duration_start'] = volume_stats.duration_start
+            volume['duration_end'] = volume_stats.duration_end
             LOG.info("volume".format(volume['volume_type']))
             #LOG.info("volume type => {volume_type}:{id}".format(volume_type=volume['volume_type'],id=ref_info['id']))            
             if volume['volume_type'] == ref_info['id']:
@@ -399,6 +413,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  tap)
             tap = self._cacher.get_resource_detail('network.tap',
                                                    tap_id)
+            tap['duration_start'] = tap_stat.duration_start
+            tap['duration_end'] = tap_stat.duration_end
             tap_bw_mb = tap_stat.max / 1.0
             bw_data.append(self.t_cloudkitty.format_item(tap,
                                                          'B',
@@ -476,6 +492,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  radosgw)
             radosgw = self._cacher.get_resource_detail('radosgw.containers.objects.size',
                                                        radosgw_container)
+            radosgw['duration_start'] = radosgw_stats.duration_start
+            radosgw['duration_end'] = radosgw_stats.duration_end
             radosgw_size_mb = radosgw_stats.max / 1.0
             radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
                                                               'B',
@@ -509,7 +527,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                      radosgw)
                 radosgw = self._cacher.get_resource_detail('radosgw.api.request',
                                                         radosgw_id)
-
+                radosgw['duration_start'] = radosgw_stats.duration_start
+                radosgw['duration_end'] = radosgw_stats.duration_end
                 radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
                                                                   'request',
                                                                   radosgw_stats.count))
@@ -555,6 +574,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  radosgw)
             radosgw = self._cacher.get_resource_detail(resource_type,
                                                        radosgw_id)
+            radosgw['duration_start'] = radosgw_stats.duration_start
+            radosgw['duration_end'] = radosgw_stats.duration_end
             radosgw_mb = radosgw_stats.sum / 1.0
             radosgw_data.append(self.t_cloudkitty.format_item(radosgw,
                                                               'B',
@@ -618,6 +639,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  lbs)
             lbs = self._cacher.get_resource_detail('network.tap',
                                                       lbs_id)
+            lbs['duration_start'] = lbs.duration_start
+            lbs['duration_end'] = lbs.duration_end
 
             lbs_bw_mb = lbs_flow / 1.0
             lbs_data.append(self.t_cloudkitty.format_item(lbs,
@@ -697,6 +720,8 @@ class CeilometerCollector(collector.BaseCollector):
                                                  network_bandwidth_pool)
             network_bandwidth_pool = self._cacher.get_resource_detail('bandwidth',
                                                       bandwidth_id)
+            network_bandwidth_pool['duration_start'] = network_bandwidth_pool.duration_start
+            network_bandwidth_pool['duration_end'] = network_bandwidth_pool.duration_end
             bandwidth_mb = bandwidth_stats.sum / 1.0
             bandwidth_data.append(self.t_cloudkitty.format_item(network_bandwidth_pool,
                                                              'B',
@@ -779,6 +804,8 @@ class CeilometerCollector(collector.BaseCollector):
 
             snapshot_size_pool = self._cacher.get_resource_detail('snapshot.size',
                                                       snapshot_size_id)
+            snapshot_size_pool['duration_start'] = snapshot_size_pool.duration_start
+            snapshot_size_pool['duration_end'] = snapshot_size_pool.duration_end
             if snapshot_size_pool['metadata']['volume_type']==ref_info['id']:
                 snapshot_size_data.append(self.t_cloudkitty.format_item(snapshot_size_pool,
                                                              'GB',
