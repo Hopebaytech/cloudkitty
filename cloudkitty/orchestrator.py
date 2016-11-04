@@ -182,9 +182,13 @@ class Worker(BaseWorker):
             return False
 
     def _release(self):
-        with self._conn as cur:
-            cur.execute("SELECT RELEASE_LOCK(%s);", self._tenant_id)
-            return cur.fetchone()[0]
+        try:
+            with self._conn as cur:
+                cur.execute("SELECT RELEASE_LOCK(%s);", self._tenant_id)
+                return cur.fetchone()[0]
+        except pymysql.MySQLError as e:
+            LOG.info(e)
+            return False
 
     def _is_used_lock(self):
         try:
