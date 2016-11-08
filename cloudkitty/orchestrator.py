@@ -310,6 +310,7 @@ class Orchestrator(object):
 
     def _load_tenant_list(self):
         self._tenants = self.fetcher.get_tenants()
+        random.shuffle(self._tenants)
 
     def _init_messaging(self):
         target = messaging.Target(topic='cloudkitty',
